@@ -2,207 +2,214 @@ package model;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import static org.junit.jupiter.api.Assertions.*;
 
-class RentalTest {
+class PaymentTest {
     
     private Car tesla;
-    private Car bmw;
-    private Car toyota;
     private Customer customer;
     private Rental rental;
+    private Payment payment;
+    
+    // For testing console output
+    private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    private final PrintStream originalOut = System.out;
     
     @BeforeEach
     void setUp() {
         tesla = new ElectricCar("E001", "Tesla Model 3", 100.0, 75.0);
-        bmw = new GasCar("G001", "BMW X5", 150.0, "Diesel");
-        toyota = new GasCar("G002", "Toyota Camry", 80.0, "Gasoline");
         customer = new Customer("CUST001", "John Smith", "555-1234");
         rental = new Rental("R001", tesla, customer, 5);
+        payment = new Payment("PAY001", rental, rental.getTotalFee());
+        
+        // Capture console output
+        System.setOut(new PrintStream(outputStream));
+    }
+    
+    @AfterEach
+    void restoreStreams() {
+        // Restore original System.out
+        System.setOut(originalOut);
     }
     
     @Test
     void testConstructor() {
-        assertEquals("R001", rental.getRentalId());
-        assertEquals(tesla, rental.getCar());
-        assertEquals(customer, rental.getCustomer());
-        assertEquals(5, rental.getDays());
-        assertFalse(rental.isReturned());
+        assertEquals("PAY001", payment.getPaymentId());
+        assertEquals(rental, payment.getRental());
+        assertEquals(450.0, payment.getAmount(), 0.01);
+        assertFalse(payment.isPaid()); // Initially unpaid
     }
     
     @Test
-    void testGetRentalId() {
-        assertEquals("R001", rental.getRentalId());
+    void testGetPaymentId() {
+        assertEquals("PAY001", payment.getPaymentId());
     }
     
     @Test
-    void testGetCar() {
-        assertEquals(tesla, rental.getCar());
+    void testGetRental() {
+        assertEquals(rental, payment.getRental());
     }
     
     @Test
-    void testGetCustomer() {
-        assertEquals(customer, rental.getCustomer());
+    void testGetAmount() {
+        assertEquals(450.0, payment.getAmount(), 0.01);
     }
     
     @Test
-    void testGetDays() {
-        assertEquals(5, rental.getDays());
+    void testIsPaid_InitiallyFalse() {
+        assertFalse(payment.isPaid());
     }
     
     @Test
-    void testIsReturned_InitiallyFalse() {
-        assertFalse(rental.isReturned());
-    }
-    
-    @Test
-    void testSetReturned() {
+    void testSetPaid() {
         // Initially false
-        assertFalse(rental.isReturned());
+        assertFalse(payment.isPaid());
         
-        // Mark as returned
-        rental.setReturned(true);
-        assertTrue(rental.isReturned());
+        // Mark as paid
+        payment.setPaid(true);
+        assertTrue(payment.isPaid());
         
-        // Mark as not returned again
-        rental.setReturned(false);
-        assertFalse(rental.isReturned());
+        // Mark as unpaid again
+        payment.setPaid(false);
+        assertFalse(payment.isPaid());
     }
     
     @Test
-    void testGetTotalFee_ElectricCar() {
-        // Act: Get total fee (should use ElectricCar calculation)
-        double fee = rental.getTotalFee();
+    void testProcessPayment_ChangesPaidStatus() {
+        // Initially unpaid
+        assertFalse(payment.isPaid());
         
-        // Assert: 5 days × $100 × 0.9 = $450
-        assertEquals(450.0, fee, 0.01);
+        // Process payment
+        payment.processPayment();
+        
+        // Now paid
+        assertTrue(payment.isPaid());
     }
     
     @Test
-    void testGetTotalFee_GasCar_Diesel() {
-        // Arrange: Create rental with BMW (diesel)
-        Rental bmwRental = new Rental("R002", bmw, customer, 7);
+    void testProcessPayment_PrintsConfirmation() {
+        // Act: Process payment (output captured)
+        payment.processPayment();
         
-        // Act
-        double fee = bmwRental.getTotalFee();
-        
-        // Assert: 7 × $150 × 1.15 = $1,207.50
-        assertEquals(1207.50, fee, 0.01);
+        // Assert: Check console output
+        String output = outputStream.toString();
+        assertTrue(output.contains("Payment processed successfully!"));
+        assertTrue(output.contains("PAY001"));
+        assertTrue(output.contains("450.0"));
     }
     
     @Test
-    void testGetTotalFee_GasCar_Gasoline() {
-        // Arrange: Create rental with Toyota (gasoline)
-        Rental toyotaRental = new Rental("R003", toyota, customer, 3);
+    void testPaymentLinkedToRental() {
+        // Payment HAS-A Rental
+        assertNotNull(payment.getRental());
         
-        // Act
-        double fee = toyotaRental.getTotalFee();
-        
-        // Assert: 3 × $80 = $240
-        assertEquals(240.0, fee, 0.01);
+        // Can access rental details through payment
+        assertEquals("R001", payment.getRental().getRentalId());
+        assertEquals(customer, payment.getRental().getCustomer());
+        assertEquals(tesla, payment.getRental().getCar());
     }
     
     @Test
-    void testGetTotalFee_Polymorphism() {
-        // CRITICAL TEST: Proves POLYMORPHISM works!
-        
-        // Arrange: Three rentals with different car types, same duration
-        Rental electricRental = new Rental("R001", tesla, customer, 5);
-        Rental dieselRental = new Rental("R002", bmw, customer, 5);
-        Rental gasolineRental = new Rental("R003", toyota, customer, 5);
-        
-        // Act: Same method call, different results
-        double electricFee = electricRental.getTotalFee();
-        double dieselFee = dieselRental.getTotalFee();
-        double gasolineFee = gasolineRental.getTotalFee();
-        
-        // Assert: Three different fees due to polymorphism
-        assertEquals(450.0, electricFee, 0.01);    // 5 × 100 × 0.9
-        assertEquals(862.50, dieselFee, 0.01);     // 5 × 150 × 1.15
-        assertEquals(400.0, gasolineFee, 0.01);    // 5 × 80 × 1.0
-        
-        // All different - proves polymorphism!
-        assertNotEquals(electricFee, dieselFee);
-        assertNotEquals(electricFee, gasolineFee);
-        assertNotEquals(dieselFee, gasolineFee);
+    void testPaymentAmountMatchesRentalFee() {
+        // Payment amount should equal rental total fee
+        assertEquals(rental.getTotalFee(), payment.getAmount(), 0.01);
     }
     
     @Test
-    void testComposition_HasACar() {
-        // Rental HAS-A Car
-        assertNotNull(rental.getCar());
+    void testMultiplePayments() {
+        // Create different rentals and payments
+        Car bmw = new GasCar("G001", "BMW X5", 150.0, "Diesel");
+        Rental rental2 = new Rental("R002", bmw, customer, 7);
+        Payment payment2 = new Payment("PAY002", rental2, rental2.getTotalFee());
         
-        // Can access car details through rental
-        assertEquals("E001", rental.getCar().getId());
-        assertEquals("Tesla Model 3", rental.getCar().getBrand());
-        assertEquals(100.0, rental.getCar().getPricePerDay());
+        // Each payment is independent
+        assertNotEquals(payment.getPaymentId(), payment2.getPaymentId());
+        assertNotEquals(payment.getRental(), payment2.getRental());
+        assertNotEquals(payment.getAmount(), payment2.getAmount());
+        
+        // Verify amounts
+        assertEquals(450.0, payment.getAmount(), 0.01);      // Tesla electric
+        assertEquals(1207.50, payment2.getAmount(), 0.01);   // BMW diesel
     }
     
     @Test
-    void testComposition_HasACustomer() {
-        // Rental HAS-A Customer
-        assertNotNull(rental.getCustomer());
+    void testPaymentWorkflow() {
+        // Simulate real payment workflow
         
-        // Can access customer details through rental
-        assertEquals("CUST001", rental.getCustomer().getCustomerId());
-        assertEquals("John Smith", rental.getCustomer().getName());
-        assertEquals("555-1234", rental.getCustomer().getPhone());
+        // 1. Payment created (unpaid)
+        Payment newPayment = new Payment("PAY001", rental, rental.getTotalFee());
+        assertFalse(newPayment.isPaid());
+        
+        // 2. Verify amount before processing
+        assertEquals(450.0, newPayment.getAmount(), 0.01);
+        
+        // 3. Process payment
+        newPayment.processPayment();
+        
+        // 4. Verify payment completed
+        assertTrue(newPayment.isPaid());
+        
+        // 5. Amount unchanged after processing
+        assertEquals(450.0, newPayment.getAmount(), 0.01);
     }
     
     @Test
-    void testDifferentDurations() {
-        // Arrange: Rentals with different durations
-        Rental shortRental = new Rental("R001", tesla, customer, 1);
-        Rental mediumRental = new Rental("R002", tesla, customer, 7);
-        Rental longRental = new Rental("R003", tesla, customer, 14);
+    void testPaymentWithDifferentCarTypes() {
+        // Test payments for all car types
         
-        // Act
-        double shortFee = shortRental.getTotalFee();
-        double mediumFee = mediumRental.getTotalFee();
-        double longFee = longRental.getTotalFee();
+        // Electric car payment
+        Car electric = new ElectricCar("E001", "Tesla", 100.0, 75.0);
+        Rental electricRental = new Rental("R001", electric, customer, 5);
+        Payment electricPayment = new Payment("PAY001", electricRental, electricRental.getTotalFee());
         
-        // Assert: Fee scales linearly with duration
-        assertEquals(90.0, shortFee, 0.01);       // 1 × 100 × 0.9
-        assertEquals(630.0, mediumFee, 0.01);     // 7 × 100 × 0.9
-        assertEquals(1260.0, longFee, 0.01);      // 14 × 100 × 0.9
+        // Diesel car payment
+        Car diesel = new GasCar("G001", "BMW", 150.0, "Diesel");
+        Rental dieselRental = new Rental("R002", diesel, customer, 5);
+        Payment dieselPayment = new Payment("PAY002", dieselRental, dieselRental.getTotalFee());
         
-        // Longer rentals cost more
-        assertTrue(shortFee < mediumFee);
-        assertTrue(mediumFee < longFee);
+        // Gasoline car payment
+        Car gasoline = new GasCar("G002", "Toyota", 80.0, "Gasoline");
+        Rental gasolineRental = new Rental("R003", gasoline, customer, 5);
+        Payment gasolinePayment = new Payment("PAY003", gasolineRental, gasolineRental.getTotalFee());
+        
+        // Verify different amounts (polymorphism reflected in payments)
+        assertEquals(450.0, electricPayment.getAmount(), 0.01);    // 5 × 100 × 0.9
+        assertEquals(862.50, dieselPayment.getAmount(), 0.01);     // 5 × 150 × 1.15
+        assertEquals(400.0, gasolinePayment.getAmount(), 0.01);    // 5 × 80 × 1.0
     }
     
     @Test
-    void testRentalLifecycle() {
-        // Simulate full rental lifecycle
+    void testComposition_TransitiveRelationship() {
+        // Payment → Rental → Car (transitive)
+        // Payment → Rental → Customer (transitive)
         
-        // 1. Rental created (not returned)
-        Rental newRental = new Rental("R001", tesla, customer, 5);
-        assertFalse(newRental.isReturned());
+        // Access car through payment
+        Car carThroughPayment = payment.getRental().getCar();
+        assertEquals("E001", carThroughPayment.getId());
         
-        // 2. Car is rented out (would happen in CarInventory)
-        // 3. Time passes...
-        
-        // 4. Customer returns car
-        newRental.setReturned(true);
-        assertTrue(newRental.isReturned());
-        
-        // 5. Fee is calculated
-        double fee = newRental.getTotalFee();
-        assertEquals(450.0, fee, 0.01);
+        // Access customer through payment
+        Customer customerThroughPayment = payment.getRental().getCustomer();
+        assertEquals("John Smith", customerThroughPayment.getName());
     }
     
     @Test
-    void testMultipleRentalsFromSameCustomer() {
-        // Same customer rents multiple cars
-        Rental rental1 = new Rental("R001", tesla, customer, 5);
-        Rental rental2 = new Rental("R002", bmw, customer, 3);
+    void testProcessPaymentIdempotence() {
+        // Processing payment multiple times should be safe
         
-        // Both rentals valid
-        assertEquals(customer, rental1.getCustomer());
-        assertEquals(customer, rental2.getCustomer());
+        assertFalse(payment.isPaid());
         
-        // Different cars and fees
-        assertNotEquals(rental1.getCar(), rental2.getCar());
-        assertNotEquals(rental1.getTotalFee(), rental2.getTotalFee());
+        // First process
+        payment.processPayment();
+        assertTrue(payment.isPaid());
+        
+        // Second process (already paid)
+        payment.processPayment();
+        assertTrue(payment.isPaid()); // Still paid
+        
+        // Amount unchanged
+        assertEquals(450.0, payment.getAmount(), 0.01);
     }
 }
