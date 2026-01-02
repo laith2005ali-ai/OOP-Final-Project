@@ -78,5 +78,42 @@ public class Main {
         // ============== STEP 7: Display Available Cars (After Rentals) ==============
         System.out.println("--- Step 7: Display Available Cars (After Rentals) ---");
         inventory.displayAvailableCars();
+        
+        // ============== STEP 8: Process Payments ==============
+        System.out.println("--- Step 8: Processing Payments ---\n");
+        
+        if (rental1 != null) {
+            Payment payment1 = new Payment("PAY001", rental1, rental1.getTotalFee());
+            System.out.println("Creating payment for " + customer1.getName() + "'s rental...");
+            payment1.processPayment();
+            System.out.println();
+        }
+        
+        if (rental2 != null) {
+            Payment payment2 = new Payment("PAY002", rental2, rental2.getTotalFee());
+            System.out.println("Creating payment for " + customer2.getName() + "'s rental...");
+            payment2.processPayment();
+            System.out.println();
+        }
+        
+        if (rental3 != null) {
+            Payment payment3 = new Payment("PAY003", rental3, rental3.getTotalFee());
+            System.out.println("Creating payment for " + customer3.getName() + "'s rental...");
+            payment3.processPayment();
+            System.out.println();
+        }
+        
+        // ============== STEP 9: Return Cars ==============
+        System.out.println("--- Step 9: Returning Cars ---\n");
+        
+        System.out.println(">> John returns his car (Rental ID: R1)");
+        inventory.returnCar("R1");
+        
+        System.out.println(">> Mike returns his car (Rental ID: R3)");
+        inventory.returnCar("R3");
+        
+        // ============== STEP 10: Display Available Cars (After Returns) ==============
+        System.out.println("--- Step 10: Display Available Cars (After Returns) ---");
+        inventory.displayAvailableCars();
     }
 }
