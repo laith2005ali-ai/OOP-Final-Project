@@ -115,5 +115,62 @@ public class Main {
         // ============== STEP 10: Display Available Cars (After Returns) ==============
         System.out.println("--- Step 10: Display Available Cars (After Returns) ---");
         inventory.displayAvailableCars();
+        
+        // ============== STEP 11: Search Features ==============
+        System.out.println("--- Step 11: Testing Search Features ---\n");
+        
+        // Search by brand
+        System.out.println(">> Searching for Tesla cars:");
+        var teslas = inventory.searchByBrand("Tesla");
+        System.out.println("Found " + teslas.size() + " Tesla car(s) available");
+        for (Car car : teslas) {
+            System.out.println("  - " + car.getId() + ": " + car.getBrand() + " ($" + car.getPricePerDay() + "/day)");
+        }
+        System.out.println();
+        
+        // Search by fuel type
+        System.out.println(">> Searching for Diesel cars:");
+        var dieselCars = inventory.searchByFuelType("Diesel");
+        System.out.println("Found " + dieselCars.size() + " Diesel car(s) available");
+        for (Car car : dieselCars) {
+            System.out.println("  - " + car.getId() + ": " + car.getBrand() + " ($" + car.getPricePerDay() + "/day)");
+        }
+        System.out.println();
+        
+        // ============== STEP 12: Rental Summary ==============
+        System.out.println("--- Step 12: Rental Summary Report ---\n");
+        
+        var allRentals = inventory.getAllRentals();
+        System.out.println("Total Rentals Created: " + allRentals.size());
+        
+        int activeRentals = 0;
+        int completedRentals = 0;
+        double totalRevenue = 0.0;
+        
+        for (Rental rental : allRentals) {
+            if (rental.isReturned()) {
+                completedRentals++;
+                totalRevenue += rental.getTotalFee();
+            } else {
+                activeRentals++;
+            }
+        }
+        
+        System.out.println("Active Rentals: " + activeRentals);
+        System.out.println("Completed Rentals: " + completedRentals);
+        System.out.println("Total Revenue from Completed Rentals: $" + totalRevenue);
+        System.out.println();
+        
+        // ============== FINAL MESSAGE ==============
+        System.out.println("========================================");
+        System.out.println("   DEMO COMPLETED SUCCESSFULLY!");
+        System.out.println("========================================");
+        System.out.println("\nAll OOP principles demonstrated:");
+        System.out.println("✓ Inheritance (Car → ElectricCar/GasCar)");
+        System.out.println("✓ Polymorphism (Different rental fees per car type)");
+        System.out.println("✓ Encapsulation (Private fields, public methods)");
+        System.out.println("✓ Abstraction (Abstract Car class, Rentable interface)");
+        System.out.println("✓ Composition (Rental has Car and Customer)");
+        System.out.println("\nSystem is fully operational! 🚗✨");
     }
 }
