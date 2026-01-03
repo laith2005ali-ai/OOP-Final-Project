@@ -1,18 +1,21 @@
-package model;
+package service;
 
+import model.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
-class PaymentTest {
+class CarInventoryTest {
     
+    private CarInventory inventory;
     private Car tesla;
+    private Car bmw;
+    private Car toyota;
     private Customer customer;
-    private Rental rental;
-    private Payment payment;
     
     // For testing console output
     private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -20,10 +23,11 @@ class PaymentTest {
     
     @BeforeEach
     void setUp() {
+        inventory = new CarInventory();
         tesla = new ElectricCar("E001", "Tesla Model 3", 100.0, 75.0);
+        bmw = new GasCar("G001", "BMW X5", 150.0, "Diesel");
+        toyota = new GasCar("G002", "Toyota Camry", 80.0, "Gasoline");
         customer = new Customer("CUST001", "John Smith", "555-1234");
-        rental = new Rental("R001", tesla, customer, 5);
-        payment = new Payment("PAY001", rental, rental.getTotalFee());
         
         // Capture console output
         System.setOut(new PrintStream(outputStream));
@@ -31,185 +35,467 @@ class PaymentTest {
     
     @AfterEach
     void restoreStreams() {
-        // Restore original System.out
         System.setOut(originalOut);
     }
     
-    @Test
-    void testConstructor() {
-        assertEquals("PAY001", payment.getPaymentId());
-        assertEquals(rental, payment.getRental());
-        assertEquals(450.0, payment.getAmount(), 0.01);
-        assertFalse(payment.isPaid()); // Initially unpaid
-    }
+    // ============== CAR MANAGEMENT TESTS ==============
     
     @Test
-    void testGetPaymentId() {
-        assertEquals("PAY001", payment.getPaymentId());
-    }
-    
-    @Test
-    void testGetRental() {
-        assertEquals(rental, payment.getRental());
-    }
-    
-    @Test
-    void testGetAmount() {
-        assertEquals(450.0, payment.getAmount(), 0.01);
-    }
-    
-    @Test
-    void testIsPaid_InitiallyFalse() {
-        assertFalse(payment.isPaid());
-    }
-    
-    @Test
-    void testSetPaid() {
-        // Initially false
-        assertFalse(payment.isPaid());
+    void testAddCar() {
+        // Act
+        inventory.addCar(tesla);
         
-        // Mark as paid
-        payment.setPaid(true);
-        assertTrue(payment.isPaid());
-        
-        // Mark as unpaid again
-        payment.setPaid(false);
-        assertFalse(payment.isPaid());
+        // Assert: Car can be found
+        Car found = inventory.findCarById("E001");
+        assertNotNull(found);
+        assertEquals(tesla, found);
     }
     
     @Test
-    void testProcessPayment_ChangesPaidStatus() {
-        // Initially unpaid
-        assertFalse(payment.isPaid());
+    void testAddMultipleCars() {
+        // Act
+        inventory.addCar(tesla);
+        inventory.addCar(bmw);
+        inventory.addCar(toyota);
         
-        // Process payment
-        payment.processPayment();
-        
-        // Now paid
-        assertTrue(payment.isPaid());
+        // Assert: All cars can be found
+        assertNotNull(inventory.findCarById("E001"));
+        assertNotNull(inventory.findCarById("G001"));
+        assertNotNull(inventory.findCarById("G002"));
     }
     
     @Test
-    void testProcessPayment_PrintsConfirmation() {
-        // Act: Process payment (output captured)
-        payment.processPayment();
+    void testFindCarById_Found() {
+        // Arrange
+        inventory.addCar(tesla);
+        
+        // Act
+        Car found = inventory.findCarById("E001");
+        
+        // Assert
+        assertNotNull(found);
+        assertEquals("E001", found.getId());
+        assertEquals("Tesla Model 3", found.getBrand());
+    }
+    
+    @Test
+    void testFindCarById_NotFound() {
+        // Act
+        Car found = inventory.findCarById("X999");
+        
+        // Assert
+        assertNull(found);
+    }
+    
+    @Test
+    void testRemoveCar_Success() {
+        // Arrange
+        inventory.addCar(tesla);
+        
+        // Act
+        inventory.removeCar("E001");
+        
+        // Assert: Car no longer exists
+        Car found = inventory.findCarById("E001");
+        assertNull(found);
+    }
+    
+    @Test
+    void testRemoveCar_NotFound() {
+        // Act: Try to remove non-existent car
+        inventory.removeCar("X999");
         
         // Assert: Check console output
         String output = outputStream.toString();
-        assertTrue(output.contains("Payment processed successfully!"));
-        assertTrue(output.contains("PAY001"));
-        assertTrue(output.contains("450.0"));
+        assertTrue(output.contains("Car not found"));
     }
     
     @Test
-    void testPaymentLinkedToRental() {
-        // Payment HAS-A Rental
-        assertNotNull(payment.getRental());
+    void testDisplayAvailableCars_EmptyInventory() {
+        // Act
+        inventory.displayAvailableCars();
         
-        // Can access rental details through payment
-        assertEquals("R001", payment.getRental().getRentalId());
-        assertEquals(customer, payment.getRental().getCustomer());
-        assertEquals(tesla, payment.getRental().getCar());
+        // Assert: Should show "no cars available"
+        String output = outputStream.toString();
+        assertTrue(output.contains("No cars currently available"));
     }
     
     @Test
-    void testPaymentAmountMatchesRentalFee() {
-        // Payment amount should equal rental total fee
-        assertEquals(rental.getTotalFee(), payment.getAmount(), 0.01);
+    void testDisplayAvailableCars_WithCars() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.addCar(bmw);
+        
+        // Act
+        inventory.displayAvailableCars();
+        
+        // Assert: Should show both cars
+        String output = outputStream.toString();
+        assertTrue(output.contains("E001"));
+        assertTrue(output.contains("Tesla Model 3"));
+        assertTrue(output.contains("G001"));
+        assertTrue(output.contains("BMW X5"));
+    }
+    
+    // ============== RENTAL MANAGEMENT TESTS ==============
+    
+    @Test
+    void testRentCar_Success() {
+        // Arrange
+        inventory.addCar(tesla);
+        
+        // Act
+        Rental rental = inventory.rentCar("E001", customer, 5);
+        
+        // Assert
+        assertNotNull(rental);
+        assertEquals("R1", rental.getRentalId());
+        assertEquals(tesla, rental.getCar());
+        assertEquals(customer, rental.getCustomer());
+        assertEquals(5, rental.getDays());
+        assertFalse(rental.isReturned());
+        
+        // Car should be unavailable
+        assertFalse(tesla.isAvailable());
     }
     
     @Test
-    void testMultiplePayments() {
-        // Create different rentals and payments
-        Car bmw = new GasCar("G001", "BMW X5", 150.0, "Diesel");
-        Rental rental2 = new Rental("R002", bmw, customer, 7);
-        Payment payment2 = new Payment("PAY002", rental2, rental2.getTotalFee());
+    void testRentCar_CarNotFound() {
+        // Act: Try to rent non-existent car
+        Rental rental = inventory.rentCar("X999", customer, 5);
         
-        // Each payment is independent
-        assertNotEquals(payment.getPaymentId(), payment2.getPaymentId());
-        assertNotEquals(payment.getRental(), payment2.getRental());
-        assertNotEquals(payment.getAmount(), payment2.getAmount());
+        // Assert
+        assertNull(rental);
         
-        // Verify amounts
-        assertEquals(450.0, payment.getAmount(), 0.01);      // Tesla electric
-        assertEquals(1207.50, payment2.getAmount(), 0.01);   // BMW diesel
+        // Check error message
+        String output = outputStream.toString();
+        assertTrue(output.contains("ERROR"));
+        assertTrue(output.contains("not found"));
     }
     
     @Test
-    void testPaymentWorkflow() {
-        // Simulate real payment workflow
+    void testRentCar_CarAlreadyRented() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.rentCar("E001", customer, 5); // First rental
         
-        // 1. Payment created (unpaid)
-        Payment newPayment = new Payment("PAY001", rental, rental.getTotalFee());
-        assertFalse(newPayment.isPaid());
+        // Act: Try to rent same car again
+        Customer customer2 = new Customer("CUST002", "Jane Doe", "555-5678");
+        Rental rental2 = inventory.rentCar("E001", customer2, 3);
         
-        // 2. Verify amount before processing
-        assertEquals(450.0, newPayment.getAmount(), 0.01);
+        // Assert
+        assertNull(rental2);
         
-        // 3. Process payment
-        newPayment.processPayment();
-        
-        // 4. Verify payment completed
-        assertTrue(newPayment.isPaid());
-        
-        // 5. Amount unchanged after processing
-        assertEquals(450.0, newPayment.getAmount(), 0.01);
+        // Check error message
+        String output = outputStream.toString();
+        assertTrue(output.contains("not available"));
     }
     
     @Test
-    void testPaymentWithDifferentCarTypes() {
-        // Test payments for all car types
+    void testRentCar_InvalidDays() {
+        // Arrange
+        inventory.addCar(tesla);
         
-        // Electric car payment
-        Car electric = new ElectricCar("E001", "Tesla", 100.0, 75.0);
-        Rental electricRental = new Rental("R001", electric, customer, 5);
-        Payment electricPayment = new Payment("PAY001", electricRental, electricRental.getTotalFee());
+        // Act: Try to rent for 0 days
+        Rental rental = inventory.rentCar("E001", customer, 0);
         
-        // Diesel car payment
-        Car diesel = new GasCar("G001", "BMW", 150.0, "Diesel");
-        Rental dieselRental = new Rental("R002", diesel, customer, 5);
-        Payment dieselPayment = new Payment("PAY002", dieselRental, dieselRental.getTotalFee());
+        // Assert
+        assertNull(rental);
         
-        // Gasoline car payment
-        Car gasoline = new GasCar("G002", "Toyota", 80.0, "Gasoline");
-        Rental gasolineRental = new Rental("R003", gasoline, customer, 5);
-        Payment gasolinePayment = new Payment("PAY003", gasolineRental, gasolineRental.getTotalFee());
-        
-        // Verify different amounts (polymorphism reflected in payments)
-        assertEquals(450.0, electricPayment.getAmount(), 0.01);    // 5 × 100 × 0.9
-        assertEquals(862.50, dieselPayment.getAmount(), 0.01);     // 5 × 150 × 1.15
-        assertEquals(400.0, gasolinePayment.getAmount(), 0.01);    // 5 × 80 × 1.0
+        // Check error message
+        String output = outputStream.toString();
+        assertTrue(output.contains("must be positive"));
     }
     
     @Test
-    void testComposition_TransitiveRelationship() {
-        // Payment → Rental → Car (transitive)
-        // Payment → Rental → Customer (transitive)
+    void testRentCar_AutoIncrementRentalId() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.addCar(bmw);
+        inventory.addCar(toyota);
         
-        // Access car through payment
-        Car carThroughPayment = payment.getRental().getCar();
-        assertEquals("E001", carThroughPayment.getId());
+        Customer c1 = new Customer("C001", "Alice", "111");
+        Customer c2 = new Customer("C002", "Bob", "222");
+        Customer c3 = new Customer("C003", "Charlie", "333");
         
-        // Access customer through payment
-        Customer customerThroughPayment = payment.getRental().getCustomer();
-        assertEquals("John Smith", customerThroughPayment.getName());
+        // Act: Rent 3 cars
+        Rental r1 = inventory.rentCar("E001", c1, 5);
+        Rental r2 = inventory.rentCar("G001", c2, 7);
+        Rental r3 = inventory.rentCar("G002", c3, 3);
+        
+        // Assert: IDs should auto-increment
+        assertEquals("R1", r1.getRentalId());
+        assertEquals("R2", r2.getRentalId());
+        assertEquals("R3", r3.getRentalId());
     }
     
     @Test
-    void testProcessPaymentIdempotence() {
-        // Processing payment multiple times should be safe
+    void testReturnCar_Success() {
+        // Arrange
+        inventory.addCar(tesla);
+        Rental rental = inventory.rentCar("E001", customer, 5);
         
-        assertFalse(payment.isPaid());
+        // Act
+        inventory.returnCar("R1");
         
-        // First process
-        payment.processPayment();
-        assertTrue(payment.isPaid());
+        // Assert: Rental marked as returned
+        assertTrue(rental.isReturned());
         
-        // Second process (already paid)
-        payment.processPayment();
-        assertTrue(payment.isPaid()); // Still paid
-        
-        // Amount unchanged
-        assertEquals(450.0, payment.getAmount(), 0.01);
+        // Car should be available again
+        assertTrue(tesla.isAvailable());
     }
-}
+    
+    @Test
+    void testReturnCar_RentalNotFound() {
+        // Act: Try to return non-existent rental
+        inventory.returnCar("R999");
+        
+        // Assert: Check error message
+        String output = outputStream.toString();
+        assertTrue(output.contains("Rental not found"));
+    }
+    
+    @Test
+    void testReturnCar_AlreadyReturned() {
+        // Arrange
+        inventory.addCar(tesla);
+        Rental rental = inventory.rentCar("E001", customer, 5);
+        inventory.returnCar("R1"); // First return
+        
+        // Act: Try to return again
+        inventory.returnCar("R1");
+        
+        // Assert: Check error message
+        String output = outputStream.toString();
+        assertTrue(output.contains("already been returned"));
+    }
+    
+    @Test
+    void testCompleteRentalWorkflow() {
+        // Complete workflow: Add → Rent → Return
+        
+        // 1. Add car
+        inventory.addCar(tesla);
+        assertTrue(tesla.isAvailable());
+        
+        // 2. Rent car
+        Rental rental = inventory.rentCar("E001", customer, 5);
+        assertNotNull(rental);
+        assertFalse(tesla.isAvailable());
+        assertFalse(rental.isReturned());
+        
+        // 3. Return car
+        inventory.returnCar("R1");
+        assertTrue(tesla.isAvailable());
+        assertTrue(rental.isReturned());
+        
+        // 4. Can rent again
+        Customer customer2 = new Customer("CUST002", "Jane", "555-5678");
+        Rental rental2 = inventory.rentCar("E001", customer2, 3);
+        assertNotNull(rental2);
+        assertEquals("R2", rental2.getRentalId());
+    }
+    
+    // ============== SEARCH & FILTER TESTS ==============
+    
+    @Test
+    void testSearchByBrand_Found() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.addCar(new ElectricCar("E002", "Tesla Model Y", 120.0, 80.0));
+        inventory.addCar(bmw);
+        
+        // Act
+        List<Car> teslas = inventory.searchByBrand("Tesla");
+        
+        // Assert
+        assertEquals(2, teslas.size());
+        assertTrue(teslas.stream().allMatch(c -> c.getBrand().contains("Tesla")));
+    }
+    
+    @Test
+    void testSearchByBrand_NotFound() {
+        // Arrange
+        inventory.addCar(tesla);
+        
+        // Act
+        List<Car> hondas = inventory.searchByBrand("Honda");
+        
+        // Assert
+        assertTrue(hondas.isEmpty());
+    }
+    
+    @Test
+    void testSearchByBrand_CaseInsensitive() {
+        // Arrange
+        inventory.addCar(tesla);
+        
+        // Act
+        List<Car> results1 = inventory.searchByBrand("tesla");
+        List<Car> results2 = inventory.searchByBrand("TESLA");
+        List<Car> results3 = inventory.searchByBrand("TeSLa");
+        
+        // Assert: All should find the car
+        assertEquals(1, results1.size());
+        assertEquals(1, results2.size());
+        assertEquals(1, results3.size());
+    }
+    
+    @Test
+    void testSearchByBrand_OnlyAvailableCars() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.addCar(new ElectricCar("E002", "Tesla Model Y", 120.0, 80.0));
+        
+        // Rent one Tesla
+        inventory.rentCar("E001", customer, 5);
+        
+        // Act
+        List<Car> available = inventory.searchByBrand("Tesla");
+        
+        // Assert: Only one available (E002)
+        assertEquals(1, available.size());
+        assertEquals("E002", available.get(0).getId());
+    }
+    
+    @Test
+    void testSearchByFuelType_Diesel() {
+        // Arrange
+        inventory.addCar(bmw); // Diesel
+        inventory.addCar(toyota); // Gasoline
+        inventory.addCar(new GasCar("G003", "Mercedes", 130.0, "Diesel"));
+        
+        // Act
+        List<Car> dieselCars = inventory.searchByFuelType("Diesel");
+        
+        // Assert
+        assertEquals(2, dieselCars.size());
+    }
+    
+    @Test
+    void testSearchByFuelType_Gasoline() {
+        // Arrange
+        inventory.addCar(bmw); // Diesel
+        inventory.addCar(toyota); // Gasoline
+        
+        // Act
+        List<Car> gasolineCars = inventory.searchByFuelType("Gasoline");
+        
+        // Assert
+        assertEquals(1, gasolineCars.size());
+        assertEquals("G002", gasolineCars.get(0).getId());
+    }
+    
+    @Test
+    void testSearchByFuelType_ExcludesElectricCars() {
+        // Arrange
+        inventory.addCar(tesla); // Electric
+        inventory.addCar(bmw); // Diesel
+        
+        // Act
+        List<Car> dieselCars = inventory.searchByFuelType("Diesel");
+        
+        // Assert: Only BMW, not Tesla
+        assertEquals(1, dieselCars.size());
+        assertEquals("G001", dieselCars.get(0).getId());
+    }
+    
+    @Test
+    void testSearchByFuelType_OnlyAvailableCars() {
+        // Arrange
+        inventory.addCar(bmw); // Diesel
+        inventory.addCar(new GasCar("G003", "Mercedes", 130.0, "Diesel"));
+        
+        // Rent BMW
+        inventory.rentCar("G001", customer, 5);
+        
+        // Act
+        List<Car> available = inventory.searchByFuelType("Diesel");
+        
+        // Assert: Only Mercedes available
+        assertEquals(1, available.size());
+        assertEquals("G003", available.get(0).getId());
+    }
+    
+    @Test
+    void testGetAllRentals_Empty() {
+        // Act
+        List<Rental> rentals = inventory.getAllRentals();
+        
+        // Assert
+        assertNotNull(rentals);
+        assertTrue(rentals.isEmpty());
+    }
+    
+    @Test
+    void testGetAllRentals_WithRentals() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.addCar(bmw);
+        
+        Customer c1 = customer;
+        Customer c2 = new Customer("CUST002", "Jane", "555-5678");
+        
+        // Act: Create rentals
+        inventory.rentCar("E001", c1, 5);
+        inventory.rentCar("G001", c2, 7);
+        
+        List<Rental> rentals = inventory.getAllRentals();
+        
+        // Assert
+        assertEquals(2, rentals.size());
+    }
+    
+    @Test
+    void testGetAllRentals_DefensiveCopy() {
+        // Arrange
+        inventory.addCar(tesla);
+        inventory.rentCar("E001", customer, 5);
+        
+        // Act: Get rentals and try to modify
+        List<Rental> rentals = inventory.getAllRentals();
+        rentals.clear(); // Try to clear the list
+        
+        // Assert: Original list unchanged
+        List<Rental> rentalsAgain = inventory.getAllRentals();
+        assertEquals(1, rentalsAgain.size());
+    }
+    
+    // ============== INTEGRATION TESTS ==============
+    
+    @Test
+    void testMultipleRentalsAndReturns() {
+        // Arrange: Add 3 cars
+        inventory.addCar(tesla);
+        inventory.addCar(bmw);
+        inventory.addCar(toyota);
+        
+        Customer c1 = new Customer("C001", "Alice", "111");
+        Customer c2 = new Customer("C002", "Bob", "222");
+        Customer c3 = new Customer("C003", "Charlie", "333");
+        
+        // Act: Rent all 3
+        Rental r1 = inventory.rentCar("E001", c1, 5);
+        Rental r2 = inventory.rentCar("G001", c2, 7);
+        Rental r3 = inventory.rentCar("G002", c3, 3);
+        
+        // All rented
+        assertFalse(tesla.isAvailable());
+        assertFalse(bmw.isAvailable());
+        assertFalse(toyota.isAvailable());
+        
+        // Return 2 of them
+        inventory.returnCar("R1");
+        inventory.returnCar("R3");
+        
+        // Assert states
+        assertTrue(tesla.isAvailable());      // Returned
+        assertFalse(bmw.isAvailable());       // Still rented
+        assertTrue(toyota.isAvailable());     // Returned
+        
+        assertTrue(r1.isReturned());
+        assertFalse(r2.isReturned());
+        assertTrue(r3.isReturned());
+    }
+    
+    
