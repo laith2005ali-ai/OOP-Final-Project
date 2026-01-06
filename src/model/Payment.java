@@ -12,7 +12,7 @@ public class Payment {
         this.paymentId = paymentId;
         this.rental = rental;
         this.amount = amount;
-        this.paid = false;
+        this.paid = false; // Initially unpaid
     }
     
     // Getters
