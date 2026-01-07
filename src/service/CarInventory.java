@@ -17,10 +17,15 @@ public class CarInventory {
 
     // ============== CAR MANAGEMENT METHODS ==============
 
-    // Add a car to inventory
+    // Add a car to inventory (User-facing)
     public void addCar(Car car) {
         cars.put(car.getId(), car);
         System.out.println("Car added: " + car.getBrand() + " (ID: " + car.getId() + ")");
+    }
+
+    // Add a car silently (Used by CSV loading)
+    public void addCarFromStorage(Car car) {
+        cars.put(car.getId(), car);
     }
 
     // Remove a car from inventory
@@ -49,12 +54,11 @@ public class CarInventory {
                 String carType = (car instanceof ElectricCar) ? "Electric" : "Gas";
                 System.out.println(
                         "ID: " + car.getId()
-                      + " | Brand: " + car.getBrand()
-                      + " | Type: " + carType
-                      + " | Price/Day: $" + car.getPricePerDay()
+                                + " | Brand: " + car.getBrand()
+                                + " | Type: " + carType
+                                + " | Price/Day: $" + car.getPricePerDay()
                 );
 
-                // Display specific info based on car type
                 if (car instanceof ElectricCar) {
                     ElectricCar eCar = (ElectricCar) car;
                     System.out.println("   Battery: " + eCar.getBatteryCapacity() + " kWh");
@@ -79,35 +83,27 @@ public class CarInventory {
 
         Car car = findCarById(carId);
 
-        // Validation: car exists
         if (car == null) {
             System.out.println("ERROR: Car not found with ID: " + carId);
             return null;
         }
 
-        // Validation: car is available
         if (!car.isAvailable()) {
             System.out.println("ERROR: Car is not available (already rented).");
             return null;
         }
 
-        // Validation: days is positive
         if (days <= 0) {
             System.out.println("ERROR: Rental days must be positive.");
             return null;
         }
 
-        // Create rental
         String rentalId = "R" + (rentals.size() + 1);
         Rental rental = new Rental(rentalId, car, customer, days);
 
-        // Mark car as unavailable
         car.setAvailable(false);
-
-        // Add to rentals list
         rentals.add(rental);
 
-        // Success message
         System.out.println("\n===== RENTAL SUCCESSFUL =====");
         System.out.println("Rental ID: " + rental.getRentalId());
         System.out.println("Customer: " + customer.getName());
@@ -130,25 +126,19 @@ public class CarInventory {
             }
         }
 
-        // Validation: rental exists
         if (rental == null) {
             System.out.println("ERROR: Rental not found with ID: " + rentalId);
             return;
         }
 
-        // Validation: not already returned
         if (rental.isReturned()) {
             System.out.println("ERROR: This rental has already been returned.");
             return;
         }
 
-        // Mark rental as returned
         rental.setReturned(true);
-
-        // Mark car as available again
         rental.getCar().setAvailable(true);
 
-        // Success message
         System.out.println("\n===== CAR RETURNED =====");
         System.out.println("Rental ID: " + rental.getRentalId());
         System.out.println("Car: " + rental.getCar().getBrand() + " (" + rental.getCar().getId() + ")");
@@ -157,9 +147,19 @@ public class CarInventory {
         System.out.println("========================\n");
     }
 
+    // Add rental silently (Used by CSV loading)
+    public void addRentalFromStorage(Rental rental) {
+        rentals.add(rental);
+
+        // Keep inventory state consistent with stored rentals:
+        // If a rental is active (not returned), car must be unavailable.
+        if (!rental.isReturned()) {
+            rental.getCar().setAvailable(false);
+        }
+    }
+
     // ============== SEARCH & FILTER METHODS ==============
 
-    // Search cars by brand
     public List<Car> searchByBrand(String brand) {
         List<Car> results = new ArrayList<>();
         for (Car car : cars.values()) {
@@ -170,7 +170,6 @@ public class CarInventory {
         return results;
     }
 
-    // Search gas cars by fuel type
     public List<Car> searchByFuelType(String fuelType) {
         List<Car> results = new ArrayList<>();
         for (Car car : cars.values()) {
@@ -186,12 +185,10 @@ public class CarInventory {
 
     // ============== GETTERS (FOR CSV EXPORT) ==============
 
-    // Get all rentals
     public List<Rental> getAllRentals() {
         return new ArrayList<>(rentals);
     }
 
-    // ✅ THIS IS THE ONLY NEW METHOD NEEDED FOR CSV
     public Collection<Car> getAllCars() {
         return cars.values();
     }

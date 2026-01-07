@@ -3,6 +3,7 @@ package app;
 import model.*;
 import service.CarInventory;
 import service.CSVExporter;
+
 import java.util.Scanner;
 import java.util.List;
 
@@ -11,13 +12,18 @@ public class Main {
     private static Scanner scanner = new Scanner(System.in);
     private static CarInventory inventory = new CarInventory();
 
+    // CSV file names (single source of truth)
+    private static final String CARS_FILE = "cars.csv";
+    private static final String RENTALS_FILE = "rentals.csv";
+
     public static void main(String[] args) {
+
         System.out.println("========================================");
         System.out.println("   CAR RENTAL SYSTEM - INTERACTIVE");
         System.out.println("========================================\n");
 
-        // Initialize with some default cars (optional)
-        initializeDefaultCars();
+        // ====== LOAD DATA (Persistence) ======
+        loadDataOnStartup();
 
         boolean running = true;
         while (running) {
@@ -44,9 +50,19 @@ public class Main {
                     viewRentalSummary();
                     break;
                 case 7:
-                    exportToCSV();
+                    exportToCSV(); // acts as "manual save/report"
                     break;
                 case 0:
+                    // ====== AUTO SAVE ON EXIT ======
+                    try {
+                        CSVExporter.saveCars(inventory, CARS_FILE);
+                        CSVExporter.saveRentals(inventory, RENTALS_FILE);
+                        System.out.println("\n✓ Data saved successfully (cars.csv, rentals.csv).");
+                    } catch (Exception e) {
+                        System.out.println("\n✗ ERROR while saving data on exit.");
+                        e.printStackTrace();
+                    }
+
                     running = false;
                     System.out.println("\n✓ Thank you for using Car Rental System!");
                     break;
@@ -56,6 +72,34 @@ public class Main {
         }
 
         scanner.close();
+    }
+
+    private static void loadDataOnStartup() {
+        try {
+            int carsLoaded = CSVExporter.loadCarsIntoInventory(inventory, CARS_FILE);
+            int rentalsLoaded = CSVExporter.loadRentalsIntoInventory(inventory, RENTALS_FILE);
+
+            if (carsLoaded > 0) {
+                System.out.println("✓ Loaded " + carsLoaded + " car(s) from " + CARS_FILE);
+            }
+            if (rentalsLoaded > 0) {
+                System.out.println("✓ Loaded " + rentalsLoaded + " rental(s) from " + RENTALS_FILE);
+            }
+
+            // If no saved cars exist, initialize defaults (first run experience)
+            if (carsLoaded == 0) {
+                initializeDefaultCars();
+            }
+
+            System.out.println();
+
+        } catch (Exception e) {
+            // If file exists but format is wrong/outdated, show clean message and start defaults
+            System.out.println("✗ Could not load saved data (CSV format issue or first run).");
+            System.out.println("  Starting system with default cars.");
+            initializeDefaultCars();
+            System.out.println();
+        }
     }
 
     // ============== MENU ==============
@@ -69,7 +113,7 @@ public class Main {
         System.out.println("║ 4. Return a Car                    ║");
         System.out.println("║ 5. Search Cars                     ║");
         System.out.println("║ 6. View Rental Summary             ║");
-        System.out.println("║ 7. Export Data to CSV              ║");
+        System.out.println("║ 7. Export/Save Data to CSV         ║");
         System.out.println("║ 0. Exit                            ║");
         System.out.println("╚════════════════════════════════════╝");
     }
@@ -77,18 +121,18 @@ public class Main {
     // ============== 1. ADD CAR ==============
     private static void addCar() {
         System.out.println("\n--- Add New Car ---");
-        
+
         String carId = getStringInput("Enter Car ID (e.g., E001 or G001): ");
         String brand = getStringInput("Enter Car Brand (e.g., Tesla Model 3): ");
         double pricePerDay = getDoubleInput("Enter Price Per Day (USD): ");
-        
+
         System.out.println("Select Car Type:");
         System.out.println("1. Electric Car");
         System.out.println("2. Gas Car");
         int type = getIntInput("Enter choice (1 or 2): ");
-        
-        Car car = null;
-        
+
+        Car car;
+
         if (type == 1) {
             double batteryCapacity = getDoubleInput("Enter Battery Capacity (kWh): ");
             car = new ElectricCar(carId, brand, pricePerDay, batteryCapacity);
@@ -99,7 +143,7 @@ public class Main {
             System.out.println("✗ Invalid car type!");
             return;
         }
-        
+
         inventory.addCar(car);
         System.out.println("✓ Car added successfully!\n");
     }
@@ -113,29 +157,23 @@ public class Main {
     // ============== 3. RENT CAR ==============
     private static void rentCar() {
         System.out.println("\n--- Rent a Car ---");
-        
-        // Display available cars first
+
         inventory.displayAvailableCars();
-        
         String carId = getStringInput("Enter Car ID to rent: ");
-        
-        // Get customer information
+
         System.out.println("\n--- Customer Information ---");
         String customerId = getStringInput("Enter Customer ID: ");
         String customerName = getStringInput("Enter Customer Name: ");
         String customerPhone = getStringInput("Enter Customer Phone: ");
-        
+
         Customer customer = new Customer(customerId, customerName, customerPhone);
-        
         int days = getIntInput("Enter number of rental days: ");
-        
-        // Attempt to rent
+
         Rental rental = inventory.rentCar(carId, customer, days);
-        
+
         if (rental != null) {
             System.out.println("\n✓ Rental successful!");
-            
-            // Offer to process payment
+
             String processPayment = getStringInput("Process payment now? (yes/no): ");
             if (processPayment.equalsIgnoreCase("yes")) {
                 String paymentId = "PAY" + rental.getRentalId().substring(1);
@@ -149,27 +187,26 @@ public class Main {
     // ============== 4. RETURN CAR ==============
     private static void returnCar() {
         System.out.println("\n--- Return a Car ---");
-        
-        // Display active rentals
+
         List<Rental> allRentals = inventory.getAllRentals();
         System.out.println("\nActive Rentals:");
         boolean hasActive = false;
-        
+
         for (Rental rental : allRentals) {
             if (!rental.isReturned()) {
                 hasActive = true;
-                System.out.println("  Rental ID: " + rental.getRentalId() + 
-                                 " | Car: " + rental.getCar().getBrand() + 
-                                 " | Customer: " + rental.getCustomer().getName() +
-                                 " | Fee: $" + rental.getTotalFee());
+                System.out.println("  Rental ID: " + rental.getRentalId()
+                        + " | Car: " + rental.getCar().getBrand()
+                        + " | Customer: " + rental.getCustomer().getName()
+                        + " | Fee: $" + rental.getTotalFee());
             }
         }
-        
+
         if (!hasActive) {
             System.out.println("  No active rentals.");
             return;
         }
-        
+
         String rentalId = getStringInput("\nEnter Rental ID to return: ");
         inventory.returnCar(rentalId);
     }
@@ -180,33 +217,33 @@ public class Main {
         System.out.println("1. Search by Brand");
         System.out.println("2. Search by Fuel Type");
         int choice = getIntInput("Enter choice (1 or 2): ");
-        
+
         if (choice == 1) {
             String brand = getStringInput("Enter brand name: ");
             List<Car> results = inventory.searchByBrand(brand);
-            
+
             System.out.println("\nSearch Results:");
             if (results.isEmpty()) {
                 System.out.println("  No cars found.");
             } else {
                 System.out.println("  Found " + results.size() + " car(s):");
                 for (Car car : results) {
-                    System.out.println("    - " + car.getId() + ": " + car.getBrand() + 
-                                     " ($" + car.getPricePerDay() + "/day)");
+                    System.out.println("    - " + car.getId() + ": " + car.getBrand()
+                            + " ($" + car.getPricePerDay() + "/day)");
                 }
             }
         } else if (choice == 2) {
             String fuelType = getStringInput("Enter fuel type (Diesel/Gasoline): ");
             List<Car> results = inventory.searchByFuelType(fuelType);
-            
+
             System.out.println("\nSearch Results:");
             if (results.isEmpty()) {
                 System.out.println("  No cars found.");
             } else {
                 System.out.println("  Found " + results.size() + " car(s):");
                 for (Car car : results) {
-                    System.out.println("    - " + car.getId() + ": " + car.getBrand() + 
-                                     " ($" + car.getPricePerDay() + "/day)");
+                    System.out.println("    - " + car.getId() + ": " + car.getBrand()
+                            + " ($" + car.getPricePerDay() + "/day)");
                 }
             }
         } else {
@@ -218,28 +255,27 @@ public class Main {
     // ============== 6. RENTAL SUMMARY ==============
     private static void viewRentalSummary() {
         System.out.println("\n--- Rental Summary Report ---\n");
-        
+
         List<Rental> allRentals = inventory.getAllRentals();
-        
         if (allRentals.isEmpty()) {
             System.out.println("No rentals in the system.");
             return;
         }
-        
+
         int activeRentals = 0;
         int completedRentals = 0;
         double totalRevenue = 0.0;
         double pendingRevenue = 0.0;
-        
+
         System.out.println("All Rentals:");
         for (Rental rental : allRentals) {
             String status = rental.isReturned() ? "COMPLETED" : "ACTIVE";
-            System.out.println("  [" + status + "] " + 
-                             rental.getRentalId() + " | " +
-                             rental.getCar().getBrand() + " | " +
-                             rental.getCustomer().getName() + " | " +
-                             rental.getDays() + " days | $" + rental.getTotalFee());
-            
+            System.out.println("  [" + status + "] "
+                    + rental.getRentalId() + " | "
+                    + rental.getCar().getBrand() + " | "
+                    + rental.getCustomer().getName() + " | "
+                    + rental.getDays() + " days | $" + rental.getTotalFee());
+
             if (rental.isReturned()) {
                 completedRentals++;
                 totalRevenue += rental.getTotalFee();
@@ -248,7 +284,7 @@ public class Main {
                 pendingRevenue += rental.getTotalFee();
             }
         }
-        
+
         System.out.println("\nStatistics:");
         System.out.println("  Total Rentals: " + allRentals.size());
         System.out.println("  Active Rentals: " + activeRentals);
@@ -259,34 +295,36 @@ public class Main {
         System.out.println();
     }
 
-    // ============== 7. EXPORT TO CSV ==============
+    // ============== 7. EXPORT / SAVE TO CSV ==============
     private static void exportToCSV() {
-        System.out.println("\n--- Export Data to CSV ---");
-        
+        System.out.println("\n--- Export/Save Data to CSV ---");
+
         try {
-            CSVExporter.exportCarsToCSV(inventory.getAllCars(), "cars.csv");
-            CSVExporter.exportRentalsToCSV(inventory.getAllRentals(), "rentals.csv");
-            System.out.println("✓ CSV files created successfully!");
-            System.out.println("  - cars.csv");
-            System.out.println("  - rentals.csv");
+            CSVExporter.saveCars(inventory, CARS_FILE);
+            CSVExporter.saveRentals(inventory, RENTALS_FILE);
+
+            System.out.println("✓ CSV files saved successfully!");
+            System.out.println("  - " + CARS_FILE);
+            System.out.println("  - " + RENTALS_FILE);
+
         } catch (Exception e) {
-            System.out.println("✗ ERROR while exporting CSV files.");
+            System.out.println("✗ ERROR while saving CSV files.");
             e.printStackTrace();
         }
         System.out.println();
     }
 
-    // ============== HELPER METHODS ==============
+    // ============== DEFAULT DATA (First Run Only) ==============
     private static void initializeDefaultCars() {
-        // Add some default cars to start with
         inventory.addCar(new ElectricCar("E001", "Tesla Model 3", 100.0, 75.0));
         inventory.addCar(new ElectricCar("E002", "Tesla Model Y", 120.0, 80.0));
         inventory.addCar(new GasCar("G001", "BMW X5", 150.0, "Diesel"));
         inventory.addCar(new GasCar("G002", "Toyota Camry", 80.0, "Gasoline"));
-        
+
         System.out.println("✓ System initialized with 4 default cars.\n");
     }
 
+    // ============== INPUT HELPERS ==============
     private static String getStringInput(String prompt) {
         System.out.print(prompt);
         return scanner.nextLine().trim();
@@ -296,8 +334,7 @@ public class Main {
         while (true) {
             try {
                 System.out.print(prompt);
-                int value = Integer.parseInt(scanner.nextLine().trim());
-                return value;
+                return Integer.parseInt(scanner.nextLine().trim());
             } catch (NumberFormatException e) {
                 System.out.println("✗ Invalid input. Please enter a number.");
             }
@@ -308,8 +345,7 @@ public class Main {
         while (true) {
             try {
                 System.out.print(prompt);
-                double value = Double.parseDouble(scanner.nextLine().trim());
-                return value;
+                return Double.parseDouble(scanner.nextLine().trim());
             } catch (NumberFormatException e) {
                 System.out.println("✗ Invalid input. Please enter a valid number.");
             }
