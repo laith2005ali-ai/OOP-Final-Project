@@ -3,183 +3,316 @@ package app;
 import model.*;
 import service.CarInventory;
 import service.CSVExporter;
+import java.util.Scanner;
+import java.util.List;
 
 public class Main {
 
-    public static void main(String[] args) {
+    private static Scanner scanner = new Scanner(System.in);
+    private static CarInventory inventory = new CarInventory();
 
+    public static void main(String[] args) {
         System.out.println("========================================");
-        System.out.println("   CAR RENTAL SYSTEM - DEMO");
+        System.out.println("   CAR RENTAL SYSTEM - INTERACTIVE");
         System.out.println("========================================\n");
 
-        // ============== STEP 1: Create Inventory ==============
-        System.out.println("--- Step 1: Initializing Car Inventory ---\n");
-        CarInventory inventory = new CarInventory();
+        // Initialize with some default cars (optional)
+        initializeDefaultCars();
 
-        // ============== STEP 2: Add Cars ==============
-        System.out.println("--- Step 2: Adding Cars to Inventory ---\n");
+        boolean running = true;
+        while (running) {
+            displayMenu();
+            int choice = getIntInput("Enter your choice: ");
 
-        // Add Electric Cars
-        Car tesla1 = new ElectricCar("E001", "Tesla Model 3", 100.0, 75.0);
-        Car tesla2 = new ElectricCar("E002", "Tesla Model Y", 120.0, 80.0);
-        Car nissan = new ElectricCar("E003", "Nissan Leaf", 70.0, 62.0);
+            switch (choice) {
+                case 1:
+                    addCar();
+                    break;
+                case 2:
+                    displayAllCars();
+                    break;
+                case 3:
+                    rentCar();
+                    break;
+                case 4:
+                    returnCar();
+                    break;
+                case 5:
+                    searchCars();
+                    break;
+                case 6:
+                    viewRentalSummary();
+                    break;
+                case 7:
+                    exportToCSV();
+                    break;
+                case 0:
+                    running = false;
+                    System.out.println("\n✓ Thank you for using Car Rental System!");
+                    break;
+                default:
+                    System.out.println("\n✗ Invalid choice. Please try again.\n");
+            }
+        }
 
-        inventory.addCar(tesla1);
-        inventory.addCar(tesla2);
-        inventory.addCar(nissan);
+        scanner.close();
+    }
 
-        // Add Gas Cars
-        Car bmw = new GasCar("G001", "BMW X5", 150.0, "Diesel");
-        Car toyota = new GasCar("G002", "Toyota Camry", 80.0, "Gasoline");
-        Car mercedes = new GasCar("G003", "Mercedes C-Class", 130.0, "Diesel");
-        Car honda = new GasCar("G004", "Honda Civic", 75.0, "Gasoline");
+    // ============== MENU ==============
+    private static void displayMenu() {
+        System.out.println("╔════════════════════════════════════╗");
+        System.out.println("║         MAIN MENU                  ║");
+        System.out.println("╠════════════════════════════════════╣");
+        System.out.println("║ 1. Add New Car                     ║");
+        System.out.println("║ 2. Display All Available Cars      ║");
+        System.out.println("║ 3. Rent a Car                      ║");
+        System.out.println("║ 4. Return a Car                    ║");
+        System.out.println("║ 5. Search Cars                     ║");
+        System.out.println("║ 6. View Rental Summary             ║");
+        System.out.println("║ 7. Export Data to CSV              ║");
+        System.out.println("║ 0. Exit                            ║");
+        System.out.println("╚════════════════════════════════════╝");
+    }
 
-        inventory.addCar(bmw);
-        inventory.addCar(toyota);
-        inventory.addCar(mercedes);
-        inventory.addCar(honda);
+    // ============== 1. ADD CAR ==============
+    private static void addCar() {
+        System.out.println("\n--- Add New Car ---");
+        
+        String carId = getStringInput("Enter Car ID (e.g., E001 or G001): ");
+        String brand = getStringInput("Enter Car Brand (e.g., Tesla Model 3): ");
+        double pricePerDay = getDoubleInput("Enter Price Per Day (USD): ");
+        
+        System.out.println("Select Car Type:");
+        System.out.println("1. Electric Car");
+        System.out.println("2. Gas Car");
+        int type = getIntInput("Enter choice (1 or 2): ");
+        
+        Car car = null;
+        
+        if (type == 1) {
+            double batteryCapacity = getDoubleInput("Enter Battery Capacity (kWh): ");
+            car = new ElectricCar(carId, brand, pricePerDay, batteryCapacity);
+        } else if (type == 2) {
+            String fuelType = getStringInput("Enter Fuel Type (Diesel/Gasoline): ");
+            car = new GasCar(carId, brand, pricePerDay, fuelType);
+        } else {
+            System.out.println("✗ Invalid car type!");
+            return;
+        }
+        
+        inventory.addCar(car);
+        System.out.println("✓ Car added successfully!\n");
+    }
 
-        System.out.println();
-
-        // ============== STEP 3: Display Available Cars ==============
-        System.out.println("--- Step 3: Display All Available Cars ---");
+    // ============== 2. DISPLAY CARS ==============
+    private static void displayAllCars() {
+        System.out.println("\n--- All Available Cars ---");
         inventory.displayAvailableCars();
+    }
 
-        // ============== STEP 4: Create Customers ==============
-        System.out.println("--- Step 4: Creating Customers ---\n");
-
-        Customer customer1 = new Customer("CUST001", "John Smith", "555-1234");
-        Customer customer2 = new Customer("CUST002", "Sarah Johnson", "555-5678");
-        Customer customer3 = new Customer("CUST003", "Mike Davis", "555-9012");
-
-        System.out.println("Customer created: " + customer1.getName() + " (ID: " + customer1.getCustomerId() + ")");
-        System.out.println("Customer created: " + customer2.getName() + " (ID: " + customer2.getCustomerId() + ")");
-        System.out.println("Customer created: " + customer3.getName() + " (ID: " + customer3.getCustomerId() + ")");
-        System.out.println();
-
-        // ============== STEP 5: Rent Cars ==============
-        System.out.println("--- Step 5: Processing Rental Transactions ---\n");
-
-        System.out.println(">> John wants to rent Tesla Model 3 (E001) for 5 days");
-        Rental rental1 = inventory.rentCar("E001", customer1, 5);
-
-        System.out.println(">> Sarah wants to rent BMW X5 (G001) for 7 days");
-        Rental rental2 = inventory.rentCar("G001", customer2, 7);
-
-        System.out.println(">> Mike wants to rent Toyota Camry (G002) for 3 days");
-        Rental rental3 = inventory.rentCar("G002", customer3, 3);
-
-        // ============== STEP 6: Try to Rent Already Rented Car ==============
-        System.out.println("--- Step 6: Attempting to Rent Already Rented Car ---\n");
-        System.out.println(">> Sarah tries to rent Tesla Model 3 (E001) - already rented by John");
-        inventory.rentCar("E001", customer2, 4);
-        System.out.println();
-
-        // ============== STEP 7: Display Available Cars (After Rentals) ==============
-        System.out.println("--- Step 7: Display Available Cars (After Rentals) ---");
+    // ============== 3. RENT CAR ==============
+    private static void rentCar() {
+        System.out.println("\n--- Rent a Car ---");
+        
+        // Display available cars first
         inventory.displayAvailableCars();
-
-        // ============== STEP 8: Process Payments ==============
-        System.out.println("--- Step 8: Processing Payments ---\n");
-
-        if (rental1 != null) {
-            Payment payment1 = new Payment("PAY001", rental1, rental1.getTotalFee());
-            System.out.println("Creating payment for " + customer1.getName() + "'s rental...");
-            payment1.processPayment();
-            System.out.println();
+        
+        String carId = getStringInput("Enter Car ID to rent: ");
+        
+        // Get customer information
+        System.out.println("\n--- Customer Information ---");
+        String customerId = getStringInput("Enter Customer ID: ");
+        String customerName = getStringInput("Enter Customer Name: ");
+        String customerPhone = getStringInput("Enter Customer Phone: ");
+        
+        Customer customer = new Customer(customerId, customerName, customerPhone);
+        
+        int days = getIntInput("Enter number of rental days: ");
+        
+        // Attempt to rent
+        Rental rental = inventory.rentCar(carId, customer, days);
+        
+        if (rental != null) {
+            System.out.println("\n✓ Rental successful!");
+            
+            // Offer to process payment
+            String processPayment = getStringInput("Process payment now? (yes/no): ");
+            if (processPayment.equalsIgnoreCase("yes")) {
+                String paymentId = "PAY" + rental.getRentalId().substring(1);
+                Payment payment = new Payment(paymentId, rental, rental.getTotalFee());
+                payment.processPayment();
+                System.out.println();
+            }
         }
+    }
 
-        if (rental2 != null) {
-            Payment payment2 = new Payment("PAY002", rental2, rental2.getTotalFee());
-            System.out.println("Creating payment for " + customer2.getName() + "'s rental...");
-            payment2.processPayment();
-            System.out.println();
+    // ============== 4. RETURN CAR ==============
+    private static void returnCar() {
+        System.out.println("\n--- Return a Car ---");
+        
+        // Display active rentals
+        List<Rental> allRentals = inventory.getAllRentals();
+        System.out.println("\nActive Rentals:");
+        boolean hasActive = false;
+        
+        for (Rental rental : allRentals) {
+            if (!rental.isReturned()) {
+                hasActive = true;
+                System.out.println("  Rental ID: " + rental.getRentalId() + 
+                                 " | Car: " + rental.getCar().getBrand() + 
+                                 " | Customer: " + rental.getCustomer().getName() +
+                                 " | Fee: $" + rental.getTotalFee());
+            }
         }
-
-        if (rental3 != null) {
-            Payment payment3 = new Payment("PAY003", rental3, rental3.getTotalFee());
-            System.out.println("Creating payment for " + customer3.getName() + "'s rental...");
-            payment3.processPayment();
-            System.out.println();
+        
+        if (!hasActive) {
+            System.out.println("  No active rentals.");
+            return;
         }
+        
+        String rentalId = getStringInput("\nEnter Rental ID to return: ");
+        inventory.returnCar(rentalId);
+    }
 
-        // ============== STEP 9: Return Cars ==============
-        System.out.println("--- Step 9: Returning Cars ---\n");
-
-        System.out.println(">> John returns his car (Rental ID: R1)");
-        inventory.returnCar("R1");
-
-        System.out.println(">> Mike returns his car (Rental ID: R3)");
-        inventory.returnCar("R3");
-
-        // ============== STEP 10: Display Available Cars (After Returns) ==============
-        System.out.println("--- Step 10: Display Available Cars (After Returns) ---");
-        inventory.displayAvailableCars();
-
-        // ============== STEP 11: Search Features ==============
-        System.out.println("--- Step 11: Testing Search Features ---\n");
-
-        System.out.println(">> Searching for Tesla cars:");
-        var teslas = inventory.searchByBrand("Tesla");
-        System.out.println("Found " + teslas.size() + " Tesla car(s) available");
-        for (Car car : teslas) {
-            System.out.println("  - " + car.getId() + ": " + car.getBrand() + " ($" + car.getPricePerDay() + "/day)");
+    // ============== 5. SEARCH CARS ==============
+    private static void searchCars() {
+        System.out.println("\n--- Search Cars ---");
+        System.out.println("1. Search by Brand");
+        System.out.println("2. Search by Fuel Type");
+        int choice = getIntInput("Enter choice (1 or 2): ");
+        
+        if (choice == 1) {
+            String brand = getStringInput("Enter brand name: ");
+            List<Car> results = inventory.searchByBrand(brand);
+            
+            System.out.println("\nSearch Results:");
+            if (results.isEmpty()) {
+                System.out.println("  No cars found.");
+            } else {
+                System.out.println("  Found " + results.size() + " car(s):");
+                for (Car car : results) {
+                    System.out.println("    - " + car.getId() + ": " + car.getBrand() + 
+                                     " ($" + car.getPricePerDay() + "/day)");
+                }
+            }
+        } else if (choice == 2) {
+            String fuelType = getStringInput("Enter fuel type (Diesel/Gasoline): ");
+            List<Car> results = inventory.searchByFuelType(fuelType);
+            
+            System.out.println("\nSearch Results:");
+            if (results.isEmpty()) {
+                System.out.println("  No cars found.");
+            } else {
+                System.out.println("  Found " + results.size() + " car(s):");
+                for (Car car : results) {
+                    System.out.println("    - " + car.getId() + ": " + car.getBrand() + 
+                                     " ($" + car.getPricePerDay() + "/day)");
+                }
+            }
+        } else {
+            System.out.println("✗ Invalid choice!");
         }
         System.out.println();
+    }
 
-        System.out.println(">> Searching for Diesel cars:");
-        var dieselCars = inventory.searchByFuelType("Diesel");
-        System.out.println("Found " + dieselCars.size() + " Diesel car(s) available");
-        for (Car car : dieselCars) {
-            System.out.println("  - " + car.getId() + ": " + car.getBrand() + " ($" + car.getPricePerDay() + "/day)");
+    // ============== 6. RENTAL SUMMARY ==============
+    private static void viewRentalSummary() {
+        System.out.println("\n--- Rental Summary Report ---\n");
+        
+        List<Rental> allRentals = inventory.getAllRentals();
+        
+        if (allRentals.isEmpty()) {
+            System.out.println("No rentals in the system.");
+            return;
         }
-        System.out.println();
-
-        // ============== STEP 12: Rental Summary ==============
-        System.out.println("--- Step 12: Rental Summary Report ---\n");
-
-        var allRentals = inventory.getAllRentals();
-        System.out.println("Total Rentals Created: " + allRentals.size());
-
+        
         int activeRentals = 0;
         int completedRentals = 0;
         double totalRevenue = 0.0;
-
+        double pendingRevenue = 0.0;
+        
+        System.out.println("All Rentals:");
         for (Rental rental : allRentals) {
+            String status = rental.isReturned() ? "COMPLETED" : "ACTIVE";
+            System.out.println("  [" + status + "] " + 
+                             rental.getRentalId() + " | " +
+                             rental.getCar().getBrand() + " | " +
+                             rental.getCustomer().getName() + " | " +
+                             rental.getDays() + " days | $" + rental.getTotalFee());
+            
             if (rental.isReturned()) {
                 completedRentals++;
                 totalRevenue += rental.getTotalFee();
             } else {
                 activeRentals++;
+                pendingRevenue += rental.getTotalFee();
             }
         }
-
-        System.out.println("Active Rentals: " + activeRentals);
-        System.out.println("Completed Rentals: " + completedRentals);
-        System.out.println("Total Revenue from Completed Rentals: $" + totalRevenue);
+        
+        System.out.println("\nStatistics:");
+        System.out.println("  Total Rentals: " + allRentals.size());
+        System.out.println("  Active Rentals: " + activeRentals);
+        System.out.println("  Completed Rentals: " + completedRentals);
+        System.out.println("  Revenue from Completed: $" + totalRevenue);
+        System.out.println("  Pending Revenue: $" + pendingRevenue);
+        System.out.println("  Total Potential Revenue: $" + (totalRevenue + pendingRevenue));
         System.out.println();
+    }
 
-        // ============== STEP 13: EXPORT DATA TO CSV FILES ==============
-        System.out.println("--- Step 13: Exporting Data to CSV Files ---\n");
-
+    // ============== 7. EXPORT TO CSV ==============
+    private static void exportToCSV() {
+        System.out.println("\n--- Export Data to CSV ---");
+        
         try {
             CSVExporter.exportCarsToCSV(inventory.getAllCars(), "cars.csv");
             CSVExporter.exportRentalsToCSV(inventory.getAllRentals(), "rentals.csv");
-            System.out.println("CSV files created successfully.");
+            System.out.println("✓ CSV files created successfully!");
+            System.out.println("  - cars.csv");
+            System.out.println("  - rentals.csv");
         } catch (Exception e) {
-            System.out.println("ERROR while exporting CSV files.");
+            System.out.println("✗ ERROR while exporting CSV files.");
             e.printStackTrace();
         }
+        System.out.println();
+    }
 
-        // ============== FINAL MESSAGE ==============
-        System.out.println("========================================");
-        System.out.println("   DEMO COMPLETED SUCCESSFULLY!");
-        System.out.println("========================================");
-        System.out.println("\nAll OOP principles demonstrated:");
-        System.out.println("✓ Inheritance (Car → ElectricCar/GasCar)");
-        System.out.println("✓ Polymorphism (Different rental fees per car type)");
-        System.out.println("✓ Encapsulation (Private fields, public methods)");
-        System.out.println("✓ Abstraction (Abstract Car class, Rentable interface)");
-        System.out.println("✓ Composition (Rental has Car and Customer)");
+    // ============== HELPER METHODS ==============
+    private static void initializeDefaultCars() {
+        // Add some default cars to start with
+        inventory.addCar(new ElectricCar("E001", "Tesla Model 3", 100.0, 75.0));
+        inventory.addCar(new ElectricCar("E002", "Tesla Model Y", 120.0, 80.0));
+        inventory.addCar(new GasCar("G001", "BMW X5", 150.0, "Diesel"));
+        inventory.addCar(new GasCar("G002", "Toyota Camry", 80.0, "Gasoline"));
+        
+        System.out.println("✓ System initialized with 4 default cars.\n");
+    }
+
+    private static String getStringInput(String prompt) {
+        System.out.print(prompt);
+        return scanner.nextLine().trim();
+    }
+
+    private static int getIntInput(String prompt) {
+        while (true) {
+            try {
+                System.out.print(prompt);
+                int value = Integer.parseInt(scanner.nextLine().trim());
+                return value;
+            } catch (NumberFormatException e) {
+                System.out.println("✗ Invalid input. Please enter a number.");
+            }
+        }
+    }
+
+    private static double getDoubleInput(String prompt) {
+        while (true) {
+            try {
+                System.out.print(prompt);
+                double value = Double.parseDouble(scanner.nextLine().trim());
+                return value;
+            } catch (NumberFormatException e) {
+                System.out.println("✗ Invalid input. Please enter a valid number.");
+            }
+        }
     }
 }
